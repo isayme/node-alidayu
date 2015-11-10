@@ -19,5 +19,9 @@
   "bugs": {
     "url": "https://github.com/isayme/node-alidayu/issues"
   },
-  "homepage": "https://github.com/isayme/node-alidayu"
+  "homepage": "https://github.com/isayme/node-alidayu",
+  "devDependencies": {
+    "chai": "^3.4.1",
+    "mocha": "^2.3.3"
+  }
 }
