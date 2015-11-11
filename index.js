@@ -1,13 +1,10 @@
 var crypto = require('crypto');
-var http = require('http');
-var https = require('https');
+var urllib = require('urllib');
+var _ = require('lodash');
 
 var defaults = {
-  production: false,
-  app_key: '',
-  app_secret: '',
   format: 'json',
-  v: 2.0,
+  v: '2.0',
   simplify: false,
   sign_method: 'md5'
 };
@@ -24,15 +21,16 @@ var production = {
 
 // 时间戳，格式为yyyy-MM-dd HH:mm:ss，时区为GMT+8
 function timestamp() {
+  var now = new Date();
   var diff = now.getTimezoneOffset() + 480;
-  var now = new Date(Date.now() + diff * 60000);
+  var now = new Date(now.getTime() + diff * 60000);
 
   var year = now.getFullYear();
-  var month = now.getMonth() + 1;
-  var day = now.getDate();
-  var hour = now.getHours();
-  var minutes = now.getMinutes();
-  var seconds = now.getSeconds();
+  var month = ('0' + (now.getMonth() + 1)).slice(-2);
+  var day = ('0' + now.getDate()).slice(-2);
+  var hour = ('0' + now.getHours()).slice(-2);
+  var minutes = ('0' + now.getMinutes()).slice(-2);
+  var seconds = ('0' + now.getSeconds()).slice(-2);
 
   return '' + year + '-' + month + '-' + day + ' ' + hour + ':' + minutes + ':' + seconds;
 }
@@ -56,39 +54,73 @@ function merge() {
 }
 
 var AliDayu = function(options) {
-  this.options = merge(defaults, options);
+  this.app_key = options.app_key;
+  this.app_secret = options.app_secret;
 
-  if (!this.options.app_key) {
+  this.options = _.merge(_.clone(defaults), _.omit(options, ['app_secret']));
+
+  if (!this.app_key) {
     throw new Error('app_key required.');
   }
 
-  if (!this.options.app_secret) {
+  if (!this.app_secret) {
     throw new Error('app_secret required.');
   }
+
+  this.gw = 'https://eco.taobao.com/router/rest';
 
   return this;
 };
 
 AliDayu.prototype._sign = function(params) {
-  var app_secret = this.options.app_secret;
+  var app_secret = this.app_secret;
   var param_arr = [];
   for (var key in params) {
     if (typeof params[key] === 'object') {
-      params.push(key + JSON.stringify(params[key]));
+      param_arr.push(key + JSON.stringify(params[key]));
     } else {
-      params.push(key + params[key]);
+      param_arr.push(key + params[key]);
     }
   }
+
   param_arr.sort();
 
   return md5(app_secret + param_arr.join('') + app_secret);
 };
 
-AliDayu.prototype.sms = function(callback) {
+function fullEncodeURIComponent(str) {
+  var rv = encodeURIComponent(str).replace(/[!'()*~]/g, function(c) {
+    return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+  });
+  return rv.replace(/\%20/g,'+');
+}
+
+AliDayu.prototype._request = function(params, callback) {
+  for (var key in params) {
+    if (typeof params[key] === 'object') {
+      params[key] = fullEncodeURIComponent(JSON.stringify(params[key]));
+    } else {
+      params[key] = fullEncodeURIComponent(params[key]);
+    }
+  }
+
+  var options = {
+    method: 'POST',
+    data: params,
+    dataType: 'json',
+    gizp: true
+  };
+
+  urllib.request(this.gw, options, callback);
+};
+
+AliDayu.prototype.sms = function(options, callback) {
   var method = 'alibaba.aliqin.fc.voice.num.singlecall';
-  var params = merge(this.options, {method: method});
+  var params = merge(this.options, {method: method}, options);
+  params.timestamp = timestamp();
   params.sign = this._sign(params);
 
+  this._request(params, callback);
 };
 
 AliDayu.prototype.voice_doublecall = function() {
