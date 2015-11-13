@@ -2,8 +2,8 @@ var expect = require('chai').expect;
 var AliDayu = require('..');
 
 var alidayu = new AliDayu({
-  app_key: 'your app key',
-  app_secret: 'your app secret'
+  app_key: process.env.NODE_ALIDAYU_KEY,
+  app_secret: process.env.NODE_ALIDAYU_SECRET
 });
 
 describe('sms', function() {
