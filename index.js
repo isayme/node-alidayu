@@ -9,20 +9,17 @@ var defaults = {
   sign_method: 'md5'
 };
 
-var sandbox = {
-  http: 'http://gw.api.tbsandbox.com/router/rest',
-  https: 'https://gw.api.tbsandbox.com/router/rest'
-};
-
-var production = {
-  http: 'http://gw.api.taobao.com/router/rest',
-  https: 'https://eco.taobao.com/router/rest'
-}
+var valid_gws = [
+  'http://gw.api.tbsandbox.com/router/rest',  // sandbox http
+  'https://gw.api.tbsandbox.com/router/rest',  // sandbox https
+  'http://gw.api.taobao.com/router/rest', // production http
+  'https://eco.taobao.com/router/rest' // production https
+];
 
 // 时间戳，格式为yyyy-MM-dd HH:mm:ss，时区为GMT+8
 function timestamp() {
   var now = new Date();
-  var diff = now.getTimezoneOffset() + 480;
+  var diff = now.getTimezoneOffset();// + 480;
   var now = new Date(now.getTime() + diff * 60000);
 
   var year = now.getFullYear();
@@ -57,7 +54,9 @@ var AliDayu = function(options) {
   this.app_key = options.app_key;
   this.app_secret = options.app_secret;
 
-  this.options = _.merge(_.clone(defaults), _.omit(options, ['app_secret']));
+  this.gw = options.gw || 'http://gw.api.taobao.com/router/rest';
+
+  this.options = _.merge(_.clone(defaults), _.omit(options, ['app_secret', 'gw']));
 
   if (!this.app_key) {
     throw new Error('app_key required.');
@@ -67,7 +66,9 @@ var AliDayu = function(options) {
     throw new Error('app_secret required.');
   }
 
-  this.gw = 'https://eco.taobao.com/router/rest';
+  if (!_.includes(valid_gws, this.gw)) {
+    throw new Error('not valid options.gw');
+  }
 
   return this;
 };
@@ -116,7 +117,7 @@ AliDayu.prototype._request = function(params, callback) {
 
 AliDayu.prototype.sms = function(options, callback) {
   var method = 'alibaba.aliqin.fc.voice.num.singlecall';
-  var params = merge(this.options, {method: method}, options);
+  var params = _.merge({}, this.options, {method: method}, options);
   params.timestamp = timestamp();
   params.sign = this._sign(params);
 

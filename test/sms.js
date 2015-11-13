@@ -2,8 +2,8 @@ var expect = require('chai').expect;
 var AliDayu = require('..');
 
 var alidayu = new AliDayu({
-  app_key: '23265671',
-  app_secret: '09ecbd6c5c2e5dc6dd31c498489b37d0'
+  app_key: 'your app key',
+  app_secret: 'your app secret'
 });
 
 describe('sms', function() {
