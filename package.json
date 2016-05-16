@@ -1,10 +1,11 @@
 {
   "name": "node-alidayu",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "阿里大鱼Node SDK",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "test": "npm run lint && mocha",
+    "lint": "standard"
   },
   "repository": {
     "type": "git",
@@ -22,10 +23,12 @@
   "homepage": "https://github.com/isayme/node-alidayu",
   "devDependencies": {
     "chai": "^3.4.1",
-    "mocha": "^2.3.3"
+    "mocha": "^2.3.3",
+    "standard": "^7.0.1"
   },
   "dependencies": {
-    "lodash": "^3.10.1",
-    "urllib": "^2.5.0"
+    "debug": "^2.2.0",
+    "only": "0.0.2",
+    "request-promise": "^3.0.0"
   }
 }

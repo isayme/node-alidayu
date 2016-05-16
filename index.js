@@ -1,140 +1,82 @@
-var crypto = require('crypto');
-var urllib = require('urllib');
-var _ = require('lodash');
+var only = require('only')
+var debug = require('debug')('alidayu:index')
+var request = require('request-promise').defaults({
+  json: true,
+  gzip: true,
+  encoding: 'utf8'
+})
 
-var defaults = {
-  format: 'json',
-  v: '2.0',
-  simplify: false,
-  sign_method: 'md5'
-};
+var sign = require('./lib/sign')
+var timestamp = require('./lib/timestamp')
 
-var valid_gws = [
-  'http://gw.api.tbsandbox.com/router/rest',  // sandbox http
-  'https://gw.api.tbsandbox.com/router/rest',  // sandbox https
-  'http://gw.api.taobao.com/router/rest', // production http
-  'https://eco.taobao.com/router/rest' // production https
-];
+var AliDayu = function (options) {
+  options = options || {}
 
-// 时间戳，格式为yyyy-MM-dd HH:mm:ss，时区为GMT+8
-function timestamp() {
-  var now = new Date();
-  var diff = now.getTimezoneOffset();// + 480;
-  var now = new Date(now.getTime() + diff * 60000);
+  this.app_key = options.app_key
+  this.app_secret = options.app_secret
 
-  var year = now.getFullYear();
-  var month = ('0' + (now.getMonth() + 1)).slice(-2);
-  var day = ('0' + now.getDate()).slice(-2);
-  var hour = ('0' + now.getHours()).slice(-2);
-  var minutes = ('0' + now.getMinutes()).slice(-2);
-  var seconds = ('0' + now.getSeconds()).slice(-2);
-
-  return '' + year + '-' + month + '-' + day + ' ' + hour + ':' + minutes + ':' + seconds;
-}
-
-function md5(str, encoding) {
-  var md5sum = crypto.createHash('md5');
-  encoding = encoding || 'utf8';
-  return md5sum.update(str, encoding).digest('hex').toUpperCase();
-}
-
-function merge() {
-  var result = {};
-  for (var i = 0, len = arguments.length; i < len; i++) {
-    var obj = arguments[i];
-
-    for (var key in obj) {
-      result[key] = obj[key];
-    }
-  }
-  return result;
-}
-
-var AliDayu = function(options) {
-  this.app_key = options.app_key;
-  this.app_secret = options.app_secret;
-
-  this.gw = options.gw || 'http://gw.api.taobao.com/router/rest';
-
-  this.options = _.merge(_.clone(defaults), _.omit(options, ['app_secret', 'gw']));
+  this.gw = options.gw || 'http://gw.api.taobao.com/router/rest'
 
   if (!this.app_key) {
-    throw new Error('app_key required.');
+    throw new Error('app_key required.')
   }
 
   if (!this.app_secret) {
-    throw new Error('app_secret required.');
+    throw new Error('app_secret required.')
   }
 
-  if (!_.includes(valid_gws, this.gw)) {
-    throw new Error('not valid options.gw');
-  }
-
-  return this;
-};
-
-AliDayu.prototype._sign = function(params) {
-  var app_secret = this.app_secret;
-  var param_arr = [];
-  for (var key in params) {
-    if (typeof params[key] === 'object') {
-      param_arr.push(key + JSON.stringify(params[key]));
-    } else {
-      param_arr.push(key + params[key]);
-    }
-  }
-
-  param_arr.sort();
-
-  return md5(app_secret + param_arr.join('') + app_secret);
-};
-
-function fullEncodeURIComponent(str) {
-  var rv = encodeURIComponent(str).replace(/[!'()*~]/g, function(c) {
-    return '%' + c.charCodeAt(0).toString(16).toUpperCase();
-  });
-  return rv.replace(/\%20/g,'+');
+  return this
 }
 
-AliDayu.prototype._request = function(params, callback) {
+AliDayu.prototype.request = function (method, params) {
   for (var key in params) {
     if (typeof params[key] === 'object') {
-      params[key] = fullEncodeURIComponent(JSON.stringify(params[key]));
-    } else {
-      params[key] = fullEncodeURIComponent(params[key]);
+      params[key] = JSON.stringify(params[key])
     }
   }
+
+  params.method = method
+  params.format = 'json'
+  params.app_key = this.app_key
+  params.v = '2.0'
+  params.sign_method = 'md5'
+  params.timestamp = timestamp()
+  params.sign = sign(this.app_secret, params)
 
   var options = {
     method: 'POST',
-    data: params,
-    dataType: 'json',
-    gizp: true
-  };
+    uri: this.gw,
+    form: params
+  }
 
-  urllib.request(this.gw, options, callback);
-};
+  debug('request options:', options)
+  return request(options)
+}
 
-AliDayu.prototype.sms = function(options, callback) {
-  var method = 'alibaba.aliqin.fc.voice.num.singlecall';
-  var params = _.merge({}, this.options, {method: method}, options);
-  params.timestamp = timestamp();
-  params.sign = this._sign(params);
+AliDayu.prototype.sms = function (params) {
+  var method = 'alibaba.aliqin.fc.sms.num.send'
+  params = only(params, [
+    'sms_type', // required
+    'sms_free_sign_name', // required
+    'sms_param',
+    'rec_num',  // required
+    'sms_template_code'  // required
+  ])
+  params.sms_type = 'normal'
 
-  this._request(params, callback);
-};
+  return this.request(method, params)
+}
 
-AliDayu.prototype.voice_doublecall = function() {
+AliDayu.prototype.voice_doublecall = function () {
   throw new Error('not implemented!')
-};
+}
 
-AliDayu.prototype.voice_singlecall = function() {
+AliDayu.prototype.voice_singlecall = function () {
   throw new Error('not implemented!')
-};
+}
 
-AliDayu.prototype.tts_singlecall = function() {
+AliDayu.prototype.tts_singlecall = function () {
   throw new Error('not implemented!')
-};
+}
 
-var AliDaYu = AliDayu;
-module.exports = AliDayu;
+module.exports = AliDayu
